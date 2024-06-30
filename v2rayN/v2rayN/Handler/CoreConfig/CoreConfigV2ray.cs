@@ -1,9 +1,11 @@
 ﻿using System.Net;
 using System.Net.NetworkInformation;
+using System.Text.Json.Nodes;
+using v2rayN.Enums;
 using v2rayN.Models;
 using v2rayN.Resx;
 
-namespace v2rayN.Handler
+namespace v2rayN.Handler.CoreConfig
 {
     internal class CoreConfigV2ray
     {
@@ -52,7 +54,7 @@ namespace v2rayN.Handler
 
                 GenMoreOutbounds(node, v2rayConfig);
 
-                GenDns(v2rayConfig);
+                GenDns(node, v2rayConfig);
 
                 GenStatistic(v2rayConfig);
 
@@ -98,7 +100,8 @@ namespace v2rayN.Handler
         {
             try
             {
-                v2rayConfig.inbounds = new List<Inbounds4Ray>();
+                var listen = "0.0.0.0";
+                v2rayConfig.inbounds = [];
 
                 Inbounds4Ray? inbound = GetInbound(_config.inbound[0], EInboundProtocol.socks, true);
                 v2rayConfig.inbounds.Add(inbound);
@@ -112,11 +115,11 @@ namespace v2rayN.Handler
                     if (_config.inbound[0].newPort4LAN)
                     {
                         var inbound3 = GetInbound(_config.inbound[0], EInboundProtocol.socks2, true);
-                        inbound3.listen = "0.0.0.0";
+                        inbound3.listen = listen;
                         v2rayConfig.inbounds.Add(inbound3);
 
                         var inbound4 = GetInbound(_config.inbound[0], EInboundProtocol.http2, false);
-                        inbound4.listen = "0.0.0.0";
+                        inbound4.listen = listen;
                         v2rayConfig.inbounds.Add(inbound4);
 
                         //auth
@@ -131,8 +134,8 @@ namespace v2rayN.Handler
                     }
                     else
                     {
-                        inbound.listen = "0.0.0.0";
-                        inbound2.listen = "0.0.0.0";
+                        inbound.listen = listen;
+                        inbound2.listen = listen;
                     }
                 }
             }
@@ -143,24 +146,25 @@ namespace v2rayN.Handler
             return 0;
         }
 
-        private Inbounds4Ray? GetInbound(InItem inItem, EInboundProtocol protocol, bool bSocks)
+        private Inbounds4Ray GetInbound(InItem inItem, EInboundProtocol protocol, bool bSocks)
         {
             string result = Utils.GetEmbedText(Global.V2raySampleInbound);
             if (Utils.IsNullOrEmpty(result))
             {
-                return null;
+                return new();
             }
 
             var inbound = JsonUtils.Deserialize<Inbounds4Ray>(result);
             if (inbound == null)
             {
-                return null;
+                return new();
             }
             inbound.tag = protocol.ToString();
             inbound.port = inItem.localPort + (int)protocol;
             inbound.protocol = bSocks ? EInboundProtocol.socks.ToString() : EInboundProtocol.http.ToString();
             inbound.settings.udp = inItem.udpEnabled;
             inbound.sniffing.enabled = inItem.sniffingEnabled;
+            inbound.sniffing.destOverride = inItem.destOverride;
             inbound.sniffing.routeOnly = inItem.routeOnly;
 
             return inbound;
@@ -217,39 +221,43 @@ namespace v2rayN.Handler
             return 0;
         }
 
-        private int GenRoutingUserRule(RulesItem4Ray? rules, V2rayConfig v2rayConfig)
+        private int GenRoutingUserRule(RulesItem4Ray? rule, V2rayConfig v2rayConfig)
         {
             try
             {
-                if (rules == null)
+                if (rule == null)
                 {
                     return 0;
                 }
-                if (Utils.IsNullOrEmpty(rules.port))
+                if (Utils.IsNullOrEmpty(rule.port))
                 {
-                    rules.port = null;
+                    rule.port = null;
                 }
-                if (rules.domain?.Count == 0)
+                if (Utils.IsNullOrEmpty(rule.network))
                 {
-                    rules.domain = null;
+                    rule.network = null;
                 }
-                if (rules.ip?.Count == 0)
+                if (rule.domain?.Count == 0)
                 {
-                    rules.ip = null;
+                    rule.domain = null;
                 }
-                if (rules.protocol?.Count == 0)
+                if (rule.ip?.Count == 0)
                 {
-                    rules.protocol = null;
+                    rule.ip = null;
                 }
-                if (rules.inboundTag?.Count == 0)
+                if (rule.protocol?.Count == 0)
                 {
-                    rules.inboundTag = null;
+                    rule.protocol = null;
+                }
+                if (rule.inboundTag?.Count == 0)
+                {
+                    rule.inboundTag = null;
                 }
 
                 var hasDomainIp = false;
-                if (rules.domain?.Count > 0)
+                if (rule.domain?.Count > 0)
                 {
-                    var it = JsonUtils.DeepCopy(rules);
+                    var it = JsonUtils.DeepCopy(rule);
                     it.ip = null;
                     it.type = "field";
                     for (int k = it.domain.Count - 1; k >= 0; k--)
@@ -263,9 +271,9 @@ namespace v2rayN.Handler
                     v2rayConfig.routing.rules.Add(it);
                     hasDomainIp = true;
                 }
-                if (rules.ip?.Count > 0)
+                if (rule.ip?.Count > 0)
                 {
-                    var it = JsonUtils.DeepCopy(rules);
+                    var it = JsonUtils.DeepCopy(rule);
                     it.domain = null;
                     it.type = "field";
                     v2rayConfig.routing.rules.Add(it);
@@ -273,12 +281,12 @@ namespace v2rayN.Handler
                 }
                 if (!hasDomainIp)
                 {
-                    if (!Utils.IsNullOrEmpty(rules.port)
-                        || (rules.protocol?.Count > 0)
-                        || (rules.inboundTag?.Count > 0)
+                    if (!Utils.IsNullOrEmpty(rule.port)
+                        || rule.protocol?.Count > 0
+                        || rule.inboundTag?.Count > 0
                         )
                     {
-                        var it = JsonUtils.DeepCopy(rules);
+                        var it = JsonUtils.DeepCopy(rule);
                         it.type = "field";
                         v2rayConfig.routing.rules.Add(it);
                     }
@@ -562,6 +570,7 @@ namespace v2rayN.Handler
                         publicKey = node.publicKey,
                         shortId = node.shortId,
                         spiderX = node.spiderX,
+                        show = false,
                     };
 
                     streamSettings.realitySettings = realitySettings;
@@ -628,6 +637,25 @@ namespace v2rayN.Handler
                         streamSettings.httpupgradeSettings = httpupgradeSettings;
 
                         break;
+                    //splithttp
+                    case nameof(ETransport.splithttp):
+                        SplithttpSettings4Ray splithttpSettings = new()
+                        {
+                            maxUploadSize = 1000000,
+                            maxConcurrentUploads = 10
+                        };
+
+                        if (!Utils.IsNullOrEmpty(node.path))
+                        {
+                            splithttpSettings.path = node.path;
+                        }
+                        if (!Utils.IsNullOrEmpty(host))
+                        {
+                            splithttpSettings.host = host;
+                        }
+                        streamSettings.splithttpSettings = splithttpSettings;
+
+                        break;
                     //h2
                     case nameof(ETransport.h2):
                         HttpSettings4Ray httpSettings = new();
@@ -671,7 +699,7 @@ namespace v2rayN.Handler
                         {
                             authority = Utils.IsNullOrEmpty(host) ? null : host,
                             serviceName = node.path,
-                            multiMode = (node.headerType == Global.GrpcMultiMode),
+                            multiMode = node.headerType == Global.GrpcMultiMode,
                             idle_timeout = _config.grpcItem.idle_timeout,
                             health_check_timeout = _config.grpcItem.health_check_timeout,
                             permit_without_stream = _config.grpcItem.permit_without_stream,
@@ -721,7 +749,7 @@ namespace v2rayN.Handler
             return 0;
         }
 
-        private int GenDns(V2rayConfig v2rayConfig)
+        private int GenDns(ProfileItem node, V2rayConfig v2rayConfig)
         {
             try
             {
@@ -773,11 +801,31 @@ namespace v2rayN.Handler
                     }
                 }
 
+                GenDnsDomains(node, obj);
+
                 v2rayConfig.dns = obj;
             }
             catch (Exception ex)
             {
                 Logging.SaveLog(ex.Message, ex);
+            }
+            return 0;
+        }
+
+        private int GenDnsDomains(ProfileItem node, JsonNode dns)
+        {
+            var servers = dns["servers"];
+            if (servers != null)
+            {
+                if (Utils.IsDomain(node.address))
+                {
+                    var dnsServer = new DnsServer4Ray()
+                    {
+                        address = "223.5.5.5",
+                        domains = [node.address]
+                    };
+                    servers.AsArray().Insert(0, JsonUtils.SerializeToNode(dnsServer));
+                }
             }
             return 0;
         }

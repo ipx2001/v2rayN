@@ -1,4 +1,5 @@
 ﻿using System.Windows.Input;
+using v2rayN.Enums;
 
 namespace v2rayN.Models
 {
@@ -47,8 +48,8 @@ namespace v2rayN.Models
         public bool udpEnabled { get; set; }
 
         public bool sniffingEnabled { get; set; } = true;
+        public List<string>? destOverride { get; set; } = ["http", "tls"];
         public bool routeOnly { get; set; }
-
         public bool allowLANConn { get; set; }
 
         public bool newPort4LAN { get; set; }
@@ -186,7 +187,7 @@ namespace v2rayN.Models
         public string domainStrategy4Singbox { get; set; }
         public string domainMatcher { get; set; }
         public string routingIndexId { get; set; }
-        public bool enableRoutingAdvanced { get; set; }        
+        public bool enableRoutingAdvanced { get; set; }
     }
 
     [Serializable]
@@ -209,5 +210,20 @@ namespace v2rayN.Models
     {
         public int up_mbps { get; set; }
         public int down_mbps { get; set; }
+    }
+
+    [Serializable]
+    public class ClashUIItem
+    {
+        public ERuleMode ruleMode { get; set; }
+        public bool showInTaskbar { get; set; }
+        public bool enableIPv6 { get; set; }
+        public bool enableMixinContent { get; set; }
+        public int proxiesSorting { get; set; }
+        public bool proxiesAutoRefresh { get; set; }
+        public int proxiesAutoDelayTestInterval { get; set; } = 10;
+        public int connectionsSorting { get; set; }
+        public bool connectionsAutoRefresh { get; set; }
+        public int connectionsRefreshInterval { get; set; } = 2;
     }
 }

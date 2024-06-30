@@ -14,7 +14,9 @@ using System.Reactive.Linq;
 using System.Text;
 using System.Windows;
 using System.Windows.Media;
+using v2rayN.Enums;
 using v2rayN.Handler;
+using v2rayN.Handler.Fmt;
 using v2rayN.Models;
 using v2rayN.Resx;
 using v2rayN.Views;
@@ -143,22 +145,15 @@ namespace v2rayN.ViewModels
         public ReactiveCommand<Unit, Unit> GlobalHotkeySettingCmd { get; }
         public ReactiveCommand<Unit, Unit> RebootAsAdminCmd { get; }
         public ReactiveCommand<Unit, Unit> ClearServerStatisticsCmd { get; }
-        public ReactiveCommand<Unit, Unit> ImportOldGuiConfigCmd { get; }
+        public ReactiveCommand<Unit, Unit> OpenTheFileLocationCmd { get; }
+        //public ReactiveCommand<Unit, Unit> ImportOldGuiConfigCmd { get; }
 
         //CheckUpdate
         public ReactiveCommand<Unit, Unit> CheckUpdateNCmd { get; }
-
-        //public ReactiveCommand<Unit, Unit> CheckUpdateV2flyCoreCmd { get; }
-
-        //public ReactiveCommand<Unit, Unit> CheckUpdateSagerNetCoreCmd { get; }
         public ReactiveCommand<Unit, Unit> CheckUpdateXrayCoreCmd { get; }
-
-        //public ReactiveCommand<Unit, Unit> CheckUpdateClashCoreCmd { get; }
-        //public ReactiveCommand<Unit, Unit> CheckUpdateClashMetaCoreCmd { get; }
+        public ReactiveCommand<Unit, Unit> CheckUpdateClashMetaCoreCmd { get; }
         public ReactiveCommand<Unit, Unit> CheckUpdateSingBoxCoreCmd { get; }
-
         public ReactiveCommand<Unit, Unit> CheckUpdateGeoCmd { get; }
-
         public ReactiveCommand<Unit, Unit> ReloadCmd { get; }
 
         [Reactive]
@@ -248,6 +243,9 @@ namespace v2rayN.ViewModels
         [Reactive]
         public string CurrentLanguage { get; set; }
 
+        [Reactive]
+        public bool ShowCalshUI { get; set; }
+
         #endregion UI
 
         #region Init
@@ -266,9 +264,16 @@ namespace v2rayN.ViewModels
             SelectedMoveToGroup = new();
             SelectedRouting = new();
             SelectedServer = new();
-            if (_config.tunModeItem.enableTun && Utils.IsAdministrator())
+            if (_config.tunModeItem.enableTun)
             {
-                EnableTun = true;
+                if (Utils.IsAdministrator())
+                {
+                    EnableTun = true;
+                }
+                else
+                {
+                    _config.tunModeItem.enableTun = EnableTun = false;
+                }
             }
             _subId = _config.subIndexId;
 
@@ -503,39 +508,31 @@ namespace v2rayN.ViewModels
                 _statistics?.ClearAllServerStatistics();
                 RefreshServers();
             });
-            ImportOldGuiConfigCmd = ReactiveCommand.Create(() =>
+            OpenTheFileLocationCmd = ReactiveCommand.Create(() =>
             {
-                ImportOldGuiConfig();
+                Utils.ProcessStart("Explorer", $"/select,{Utils.GetConfigPath()}");
             });
+            //ImportOldGuiConfigCmd = ReactiveCommand.Create(() =>
+            //{
+            //    ImportOldGuiConfig();
+            //});
 
             //CheckUpdate
             CheckUpdateNCmd = ReactiveCommand.Create(() =>
             {
                 CheckUpdateN();
             });
-            //CheckUpdateV2flyCoreCmd = ReactiveCommand.Create(() =>
-            //{
-            //    CheckUpdateCore(ECoreType.v2fly_v5);
-            //});
-            //CheckUpdateSagerNetCoreCmd = ReactiveCommand.Create(() =>
-            //{
-            //    CheckUpdateCore(ECoreType.SagerNet);
-            //});
             CheckUpdateXrayCoreCmd = ReactiveCommand.Create(() =>
             {
-                CheckUpdateCore(ECoreType.Xray);
+                CheckUpdateCore(ECoreType.Xray, null);
             });
-            //CheckUpdateClashCoreCmd = ReactiveCommand.Create(() =>
-            //{
-            //    CheckUpdateCore(ECoreType.clash);
-            //});
-            //CheckUpdateClashMetaCoreCmd = ReactiveCommand.Create(() =>
-            //{
-            //    CheckUpdateCore(ECoreType.clash_meta);
-            //});
+            CheckUpdateClashMetaCoreCmd = ReactiveCommand.Create(() =>
+            {
+                CheckUpdateCore(ECoreType.mihomo, false);
+            });
             CheckUpdateSingBoxCoreCmd = ReactiveCommand.Create(() =>
             {
-                CheckUpdateCore(ECoreType.sing_box);
+                CheckUpdateCore(ECoreType.sing_box, null);
             });
             CheckUpdateGeoCmd = ReactiveCommand.Create(() =>
             {
@@ -575,6 +572,7 @@ namespace v2rayN.ViewModels
             AutoHideStartup();
 
             _showInTaskbar = true;
+            _config.clashUIItem.showInTaskbar = _showInTaskbar;
         }
 
         private void Init()
@@ -1021,10 +1019,10 @@ namespace v2rayN.ViewModels
         {
             ShowHideWindow(false);
 
-            var dpiXY = Utils.GetDpiXY(Application.Current.MainWindow);
+            var dpiXY = QRCodeHelper.GetDpiXY(Application.Current.MainWindow);
             string result = await Task.Run(() =>
             {
-                return Utils.ScanScreen(dpiXY.Item1, dpiXY.Item2);
+                return QRCodeHelper.ScanScreen(dpiXY.Item1, dpiXY.Item2);
             });
 
             ShowHideWindow(true);
@@ -1147,7 +1145,7 @@ namespace v2rayN.ViewModels
                 _noticeHandler?.Enqueue(ResUI.PleaseSelectServer);
                 return;
             }
-            var url = ShareHandler.GetShareUrl(item);
+            var url = FmtHandler.GetShareUri(item);
             if (Utils.IsNullOrEmpty(url))
             {
                 return;
@@ -1288,7 +1286,7 @@ namespace v2rayN.ViewModels
             StringBuilder sb = new();
             foreach (var it in lstSelecteds)
             {
-                string url = ShareHandler.GetShareUrl(it);
+                string url = FmtHandler.GetShareUri(it);
                 if (Utils.IsNullOrEmpty(url))
                 {
                     continue;
@@ -1313,7 +1311,7 @@ namespace v2rayN.ViewModels
             StringBuilder sb = new();
             foreach (var it in lstSelecteds)
             {
-                string? url = ShareHandler.GetShareUrl(it);
+                string? url = FmtHandler.GetShareUri(it);
                 if (Utils.IsNullOrEmpty(url))
                 {
                     continue;
@@ -1422,32 +1420,32 @@ namespace v2rayN.ViewModels
             catch { }
         }
 
-        private void ImportOldGuiConfig()
-        {
-            if (UI.OpenFileDialog(out string fileName,
-                "guiNConfig|*.json|All|*.*") != true)
-            {
-                return;
-            }
-            if (Utils.IsNullOrEmpty(fileName))
-            {
-                return;
-            }
+        //private void ImportOldGuiConfig()
+        //{
+        //    if (UI.OpenFileDialog(out string fileName,
+        //        "guiNConfig|*.json|All|*.*") != true)
+        //    {
+        //        return;
+        //    }
+        //    if (Utils.IsNullOrEmpty(fileName))
+        //    {
+        //        return;
+        //    }
 
-            var ret = ConfigHandler.ImportOldGuiConfig(_config, fileName);
-            if (ret == 0)
-            {
-                RefreshRoutingsMenu();
-                InitSubscriptionView();
-                RefreshServers();
-                Reload();
-                _noticeHandler?.Enqueue(ResUI.OperationSuccess);
-            }
-            else
-            {
-                _noticeHandler?.Enqueue(ResUI.OperationFailed);
-            }
-        }
+        //    var ret = ConfigHandler.ImportOldGuiConfig(_config, fileName);
+        //    if (ret == 0)
+        //    {
+        //        RefreshRoutingsMenu();
+        //        InitSubscriptionView();
+        //        RefreshServers();
+        //        Reload();
+        //        _noticeHandler?.Enqueue(ResUI.OperationSuccess);
+        //    }
+        //    else
+        //    {
+        //        _noticeHandler?.Enqueue(ResUI.OperationFailed);
+        //    }
+        //}
 
         #endregion Setting
 
@@ -1466,7 +1464,7 @@ namespace v2rayN.ViewModels
             (new UpdateHandle()).CheckUpdateGuiN(_config, _updateUI, _config.guiItem.checkPreReleaseUpdate);
         }
 
-        private void CheckUpdateCore(ECoreType type)
+        private void CheckUpdateCore(ECoreType type, bool? preRelease)
         {
             void _updateUI(bool success, string msg)
             {
@@ -1492,7 +1490,7 @@ namespace v2rayN.ViewModels
                     }
                 }
             }
-            (new UpdateHandle()).CheckUpdateCore(type, _config, _updateUI, _config.guiItem.checkPreReleaseUpdate);
+            (new UpdateHandle()).CheckUpdateCore(type, _config, _updateUI, preRelease ?? _config.guiItem.checkPreReleaseUpdate);
         }
 
         private void CheckUpdateGeo()
@@ -1515,7 +1513,12 @@ namespace v2rayN.ViewModels
                 Application.Current?.Dispatcher.Invoke((Action)(() =>
                 {
                     BlReloadEnabled = true;
+                    ShowCalshUI = (_config.runningCoreType is ECoreType.clash or ECoreType.clash_meta or ECoreType.mihomo);
+                    if (ShowCalshUI) {
+                        Locator.Current.GetService<ClashProxiesViewModel>()?.ProxiesReload();
+                    }
                 }));
+                
             });
         }
 
@@ -1560,7 +1563,7 @@ namespace v2rayN.ViewModels
         private void ChangeSystemProxyStatus(ESysProxyType type, bool blChange)
         {
             SysProxyHandle.UpdateSysProxy(_config, _config.tunModeItem.enableTun ? true : false);
-            _noticeHandler?.SendMessage(ResUI.TipChangeSystemProxy + _config.sysProxyType.ToString(), true);
+            _noticeHandler?.SendMessage($"{ResUI.TipChangeSystemProxy} - {_config.sysProxyType.ToString()}", true);
 
             Application.Current?.Dispatcher.Invoke((Action)(() =>
             {
@@ -1686,6 +1689,7 @@ namespace v2rayN.ViewModels
                 //Utile.RegWriteValue(Global.MyRegPath, Utile.WindowHwndKey, Convert.ToString((long)windowHandle));
             }
             _showInTaskbar = bl;
+            _config.clashUIItem.showInTaskbar = _showInTaskbar;
         }
 
         private void RestoreUI()
@@ -1788,6 +1792,7 @@ namespace v2rayN.ViewModels
                           Application.Current.Resources["StdFontSize1"] = size + 1;
                           Application.Current.Resources["StdFontSize2"] = size + 2;
                           Application.Current.Resources["StdFontSizeMsg"] = size - 1;
+                          Application.Current.Resources["StdFontSize-1"] = size - 1;
 
                           ConfigHandler.SaveConfig(_config);
                       }
@@ -1847,7 +1852,7 @@ namespace v2rayN.ViewModels
         {
             var theme = _paletteHelper.GetTheme();
 
-            theme.SetBaseTheme(isDarkTheme ? Theme.Dark : Theme.Light);
+            theme.SetBaseTheme(isDarkTheme ? BaseTheme.Dark : BaseTheme.Light);
             _paletteHelper.SetTheme(theme);
 
             Utils.SetDarkBorder(Application.Current.MainWindow, isDarkTheme);

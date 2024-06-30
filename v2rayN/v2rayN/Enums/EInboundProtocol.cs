@@ -1,4 +1,4 @@
-﻿namespace v2rayN.Models
+﻿namespace v2rayN.Enums
 {
     public enum EInboundProtocol
     {
@@ -8,6 +8,7 @@
         http2,
         pac,
         api,
+        api2,
         speedtest = 21
     }
 }

@@ -1,4 +1,6 @@
-﻿namespace v2rayN.Models
+﻿using v2rayN.Enums;
+
+namespace v2rayN.Models
 {
     /// <summary>
     /// 本软件配置文件实体类
@@ -31,6 +33,7 @@
         public SpeedTestItem speedTestItem { get; set; }
         public Mux4SboxItem mux4SboxItem { get; set; }
         public HysteriaItem hysteriaItem { get; set; }
+        public ClashUIItem clashUIItem { get; set; }
         public List<InItem> inbound { get; set; }
         public List<KeyEventItem> globalHotkeys { get; set; }
         public List<CoreTypeItem> coreTypeItem { get; set; }

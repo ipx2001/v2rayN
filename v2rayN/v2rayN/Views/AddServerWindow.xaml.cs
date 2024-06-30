@@ -2,6 +2,7 @@
 using System.Reactive.Disposables;
 using System.Windows;
 using System.Windows.Controls;
+using v2rayN.Enums;
 using v2rayN.Handler;
 using v2rayN.Models;
 using v2rayN.Resx;
@@ -332,6 +333,7 @@ namespace v2rayN.Views
 
                 case nameof(ETransport.ws):
                 case nameof(ETransport.httpupgrade):
+                case nameof(ETransport.splithttp):
                     tipRequestHost.Text = ResUI.TransportRequestHostTip2;
                     tipPath.Text = ResUI.TransportPathTip1;
                     break;

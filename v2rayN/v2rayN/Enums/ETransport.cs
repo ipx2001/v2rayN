@@ -1,4 +1,4 @@
-﻿namespace v2rayN.Models
+﻿namespace v2rayN.Enums
 {
     public enum ETransport
     {
@@ -6,6 +6,7 @@
         kcp,
         ws,
         httpupgrade,
+        splithttp,
         h2,
         http,
         quic,

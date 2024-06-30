@@ -1,9 +1,11 @@
-﻿using System.Net;
+﻿using System.Data;
+using System.Net;
 using System.Net.NetworkInformation;
+using v2rayN.Enums;
 using v2rayN.Models;
 using v2rayN.Resx;
 
-namespace v2rayN.Handler
+namespace v2rayN.Handler.CoreConfig
 {
     internal class CoreConfigSingbox
     {
@@ -23,6 +25,11 @@ namespace v2rayN.Handler
                     || node.port <= 0)
                 {
                     msg = ResUI.CheckServerSettings;
+                    return -1;
+                }
+                if (node.GetNetwork() is nameof(ETransport.kcp) or nameof(ETransport.splithttp))
+                {
+                    msg = ResUI.Incorrectconfiguration + $" - {node.GetNetwork()}";
                     return -1;
                 }
 
@@ -111,9 +118,11 @@ namespace v2rayN.Handler
         {
             try
             {
-                singboxConfig.inbounds.Clear();
+                var listen = "::";
+                singboxConfig.inbounds = [];
 
-                if (!_config.tunModeItem.enableTun || (_config.tunModeItem.enableTun && _config.tunModeItem.enableExInbound))
+                if (!_config.tunModeItem.enableTun
+                    || (_config.tunModeItem.enableTun && _config.tunModeItem.enableExInbound && _config.runningCoreType == ECoreType.sing_box))
                 {
                     var inbound = new Inbound4Sbox()
                     {
@@ -146,11 +155,11 @@ namespace v2rayN.Handler
                         if (_config.inbound[0].newPort4LAN)
                         {
                             var inbound3 = GetInbound(inbound, EInboundProtocol.socks2, true);
-                            inbound3.listen = "::";
+                            inbound3.listen = listen;
                             singboxConfig.inbounds.Add(inbound3);
 
                             var inbound4 = GetInbound(inbound, EInboundProtocol.http2, false);
-                            inbound4.listen = "::";
+                            inbound4.listen = listen;
                             singboxConfig.inbounds.Add(inbound4);
 
                             //auth
@@ -162,8 +171,8 @@ namespace v2rayN.Handler
                         }
                         else
                         {
-                            inbound.listen = "::";
-                            inbound2.listen = "::";
+                            inbound.listen = listen;
+                            inbound2.listen = listen;
                         }
                     }
                 }
@@ -184,7 +193,7 @@ namespace v2rayN.Handler
                     tunInbound.strict_route = _config.tunModeItem.strictRoute;
                     tunInbound.stack = _config.tunModeItem.stack;
                     tunInbound.sniff = _config.inbound[0].sniffingEnabled;
-                    tunInbound.sniff_override_destination = _config.inbound[0].routeOnly ? false : _config.inbound[0].sniffingEnabled;
+                    //tunInbound.sniff_override_destination = _config.inbound[0].routeOnly ? false : _config.inbound[0].sniffingEnabled;
                     if (_config.tunModeItem.enableIPv6Address == false)
                     {
                         tunInbound.inet6_address = null;
@@ -545,7 +554,7 @@ namespace v2rayN.Handler
                     singboxConfig.route.rules.Add(new()
                     {
                         port = [53],
-                        network = "udp",
+                        network = ["udp"],
                         outbound = dnsOutbound
                     });
                 }
@@ -660,6 +669,10 @@ namespace v2rayN.Handler
                     {
                         rule.port = new List<int> { Utils.ToInt(item.port) };
                     }
+                }
+                if (!Utils.IsNullOrEmpty(item.network))
+                {
+                    rule.network = Utils.String2List(item.network);
                 }
                 if (item.protocol?.Count > 0)
                 {
@@ -810,29 +823,56 @@ namespace v2rayN.Handler
                 {
                     return 0;
                 }
-                //Add the dns of the remote server domain
-                if (dns4Sbox.rules is null)
-                {
-                    dns4Sbox.rules = new();
-                }
-                dns4Sbox.servers.Add(new()
-                {
-                    tag = "local_local",
-                    address = "223.5.5.5",
-                    detour = Global.DirectTag,
-                });
-                dns4Sbox.rules.Add(new()
-                {
-                    server = "local_local",
-                    outbound = "any"
-                });
-
                 singboxConfig.dns = dns4Sbox;
+
+                GenDnsDomains(node, singboxConfig);
             }
             catch (Exception ex)
             {
                 Logging.SaveLog(ex.Message, ex);
             }
+            return 0;
+        }
+
+        private int GenDnsDomains(ProfileItem? node, SingboxConfig singboxConfig)
+        {
+            var dns4Sbox = singboxConfig.dns ?? new();
+            dns4Sbox.servers ??= [];
+            dns4Sbox.rules ??= [];
+
+            var tag = "local_local";
+            dns4Sbox.servers.Add(new()
+            {
+                tag = tag,
+                address = "223.5.5.5",
+                detour = Global.DirectTag,
+                //strategy = strategy
+            });
+
+            var lstDomain = singboxConfig.outbounds
+                           .Where(t => !Utils.IsNullOrEmpty(t.server) && Utils.IsDomain(t.server))
+                           .Select(t => t.server)
+                           .ToList();
+            if (lstDomain != null && lstDomain.Count > 0)
+            {
+                dns4Sbox.rules.Insert(0, new()
+                {
+                    server = tag,
+                    domain = lstDomain
+                });
+            }
+
+            //Tun2SocksAddress
+            if (_config.tunModeItem.enableTun && node?.configType == EConfigType.Socks && Utils.IsDomain(node?.sni))
+            {
+                dns4Sbox.rules.Insert(0, new()
+                {
+                    server = tag,
+                    domain = [node?.sni]
+                });
+            }
+
+            singboxConfig.dns = dns4Sbox;
             return 0;
         }
 
@@ -843,7 +883,7 @@ namespace v2rayN.Handler
                 singboxConfig.experimental ??= new Experimental4Sbox();
                 singboxConfig.experimental.clash_api = new Clash_Api4Sbox()
                 {
-                    external_controller = $"{Global.Loopback}:{LazyConfig.Instance.StatePort}",
+                    external_controller = $"{Global.Loopback}:{LazyConfig.Instance.StatePort2}",
                 };
             }
 
@@ -861,6 +901,10 @@ namespace v2rayN.Handler
 
         private int ConvertGeo2Ruleset(SingboxConfig singboxConfig)
         {
+            static void AddRuleSets(List<string> ruleSets, List<string>? rule_set)
+            {
+                if (rule_set != null) ruleSets.AddRange(rule_set);
+            }
             var geosite = "geosite";
             var geoip = "geoip";
             var ruleSets = new List<string>();
@@ -870,13 +914,13 @@ namespace v2rayN.Handler
             {
                 rule.rule_set = rule?.geosite?.Select(t => $"{geosite}-{t}").ToList();
                 rule.geosite = null;
-                ruleSets.AddRange(rule.rule_set);
+                AddRuleSets(ruleSets, rule.rule_set);
             }
             foreach (var rule in singboxConfig.route.rules.Where(t => t.geoip?.Count > 0).ToList() ?? [])
             {
                 rule.rule_set = rule?.geoip?.Select(t => $"{geoip}-{t}").ToList();
                 rule.geoip = null;
-                ruleSets.AddRange(rule.rule_set);
+                AddRuleSets(ruleSets, rule.rule_set);
             }
 
             //convert dns geosite & geoip to ruleset
@@ -892,7 +936,15 @@ namespace v2rayN.Handler
             }
             foreach (var dnsRule in singboxConfig.dns?.rules.Where(t => t.rule_set?.Count > 0).ToList() ?? [])
             {
-                ruleSets.AddRange(dnsRule.rule_set);
+                AddRuleSets(ruleSets, dnsRule.rule_set);
+            }
+            //rules in rules
+            foreach (var item in singboxConfig.dns?.rules.Where(t => t.rules?.Count > 0).Select(t => t.rules).ToList() ?? [])
+            {
+                foreach (var item2 in item ?? [])
+                {
+                    AddRuleSets(ruleSets, item2.rule_set);
+                }
             }
 
             //load custom ruleset file
@@ -918,6 +970,7 @@ namespace v2rayN.Handler
             singboxConfig.route.rule_set = [];
             foreach (var item in new HashSet<string>(ruleSets))
             {
+                if (Utils.IsNullOrEmpty(item)) { continue; }
                 var customRuleset = customRulesets.FirstOrDefault(t => t.tag != null && t.tag.Equals(item));
                 if (customRuleset != null)
                 {
@@ -930,7 +983,9 @@ namespace v2rayN.Handler
                         type = "remote",
                         format = "binary",
                         tag = item,
-                        url = string.Format(Global.SingboxRulesetUrl, item.StartsWith(geosite) ? geosite : geoip, item),
+                        url = item.StartsWith(geosite) ?
+                                string.Format(Global.SingboxRulesetUrlGeosite, item) :
+                                string.Format(Global.SingboxRulesetUrlGeoip, item.Replace($"{geoip}-", "")),
                         download_detour = Global.ProxyTag
                     });
                 }
@@ -1076,18 +1131,18 @@ namespace v2rayN.Handler
                     singboxConfig.route.rules.Add(rule);
                 }
 
-                GenDns(new(), singboxConfig);
-                var dnsServer = singboxConfig.dns?.servers.FirstOrDefault();
-                if (dnsServer != null)
-                {
-                    dnsServer.detour = singboxConfig.route.rules.LastOrDefault()?.outbound;
-                }
-                var dnsRule = singboxConfig.dns?.rules.Where(t => t.outbound != null).FirstOrDefault();
-                if (dnsRule != null)
-                {
-                    singboxConfig.dns.rules = [];
-                    singboxConfig.dns.rules.Add(dnsRule);
-                }
+                GenDnsDomains(null, singboxConfig);
+                //var dnsServer = singboxConfig.dns?.servers.FirstOrDefault();
+                //if (dnsServer != null)
+                //{
+                //    dnsServer.detour = singboxConfig.route.rules.LastOrDefault()?.outbound;
+                //}
+                //var dnsRule = singboxConfig.dns?.rules.Where(t => t.outbound != null).FirstOrDefault();
+                //if (dnsRule != null)
+                //{
+                //    singboxConfig.dns.rules = [];
+                //    singboxConfig.dns.rules.Add(dnsRule);
+                //}
 
                 //msg = string.Format(ResUI.SuccessfulConfiguration"), node.getSummary());
                 return 0;

@@ -1,8 +1,9 @@
 ﻿using System.IO;
+using v2rayN.Enums;
 using v2rayN.Models;
 using v2rayN.Resx;
 
-namespace v2rayN.Handler
+namespace v2rayN.Handler.CoreConfig
 {
     /// <summary>
     /// Core configuration file processing class
@@ -24,9 +25,17 @@ namespace v2rayN.Handler
                 msg = ResUI.InitialConfiguration;
                 if (node.configType == EConfigType.Custom)
                 {
-                    return GenerateClientCustomConfig(node, fileName, out msg);
+                    if (node.coreType is ECoreType.clash or ECoreType.clash_meta or ECoreType.mihomo)
+                    {
+                        var configGenClash = new CoreConfigClash(config);
+                        return configGenClash.GenerateClientConfig(node, fileName, out msg);
+                    }
+                    else
+                    {
+                        return GenerateClientCustomConfig(node, fileName, out msg);
+                    }
                 }
-                else if (config.tunModeItem.enableTun || LazyConfig.Instance.GetCoreType(node, node.configType) == ECoreType.sing_box)
+                else if (LazyConfig.Instance.GetCoreType(node, node.configType) == ECoreType.sing_box)
                 {
                     var configGenSingbox = new CoreConfigSingbox(config);
                     if (configGenSingbox.GenerateClientConfigContent(node, out SingboxConfig? singboxConfig, out msg) != 0)
@@ -154,7 +163,7 @@ namespace v2rayN.Handler
         {
             if (coreType == ECoreType.sing_box)
             {
-                if ((new CoreConfigSingbox(config)).GenerateClientSpeedtestConfig(selecteds, out SingboxConfig? singboxConfig, out msg) != 0)
+                if (new CoreConfigSingbox(config).GenerateClientSpeedtestConfig(selecteds, out SingboxConfig? singboxConfig, out msg) != 0)
                 {
                     return -1;
                 }
@@ -162,7 +171,7 @@ namespace v2rayN.Handler
             }
             else
             {
-                if ((new CoreConfigV2ray(config)).GenerateClientSpeedtestConfig(selecteds, out V2rayConfig? v2rayConfig, out msg) != 0)
+                if (new CoreConfigV2ray(config).GenerateClientSpeedtestConfig(selecteds, out V2rayConfig? v2rayConfig, out msg) != 0)
                 {
                     return -1;
                 }

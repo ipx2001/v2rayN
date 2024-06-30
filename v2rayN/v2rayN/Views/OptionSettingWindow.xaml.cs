@@ -30,9 +30,19 @@ namespace v2rayN.Views
 
             this.Owner = Application.Current.MainWindow;
             _config = LazyConfig.Instance.GetConfig();
+            var lstFonts = GetFonts(Utils.GetFontsPath());
 
             ViewModel = new OptionSettingViewModel(this);
 
+            clbdestOverride.SelectionChanged += ClbdestOverride_SelectionChanged;
+            Global.destOverrideProtocols.ForEach(it =>
+            {
+                clbdestOverride.Items.Add(it);
+            });
+            _config.inbound[0].destOverride?.ForEach(it =>
+            {
+                clbdestOverride.SelectedItems.Add(it);
+            });
             Global.IEProxyProtocols.ForEach(it =>
             {
                 cmbsystemProxyAdvancedProtocol.Items.Add(it);
@@ -89,50 +99,7 @@ namespace v2rayN.Views
                 cmbSubConvertUrl.Items.Add(it);
             });
 
-            //fill fonts
-            try
-            {
-                string[] searchPatterns = { "*.ttf", "*.ttc" };
-                var files = new List<string>();
-                foreach (var pattern in searchPatterns)
-                {
-                    files.AddRange(Directory.GetFiles(Utils.GetFontsPath(), pattern));
-                }
-                var culture = _config.uiItem.currentLanguage == Global.Languages[0] ? "zh-cn" : "en-us";
-                var culture2 = "en-us";
-                foreach (var ttf in files)
-                {
-                    var families = Fonts.GetFontFamilies(Utils.GetFontsPath(ttf));
-                    foreach (FontFamily family in families)
-                    {
-                        var typefaces = family.GetTypefaces();
-                        foreach (Typeface typeface in typefaces)
-                        {
-                            typeface.TryGetGlyphTypeface(out GlyphTypeface glyph);
-                            //var fontFace = glyph.Win32FaceNames[new CultureInfo("en-us")];
-                            //if (!fontFace.Equals("Regular") && !fontFace.Equals("Normal"))
-                            //{
-                            //    continue;
-                            //}
-                            var fontFamily = glyph.Win32FamilyNames[new CultureInfo(culture)];
-                            if (Utils.IsNullOrEmpty(fontFamily))
-                            {
-                                fontFamily = glyph.Win32FamilyNames[new CultureInfo(culture2)];
-                                if (Utils.IsNullOrEmpty(fontFamily))
-                                {
-                                    continue;
-                                }
-                            }
-                            cmbcurrentFontFamily.Items.Add(fontFamily);
-                            break;
-                        }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                Logging.SaveLog("fill fonts error", ex);
-            }
+            lstFonts.ForEach(it => { cmbcurrentFontFamily.Items.Add(it); });
             cmbcurrentFontFamily.Items.Add(string.Empty);
 
             this.WhenActivated(disposables =>
@@ -178,9 +145,9 @@ namespace v2rayN.Views
                 this.Bind(ViewModel, vm => vm.EnableCheckPreReleaseUpdate, v => v.togEnableCheckPreReleaseUpdate.IsChecked).DisposeWith(disposables);
                 this.Bind(ViewModel, vm => vm.EnableDragDropSort, v => v.togEnableDragDropSort.IsChecked).DisposeWith(disposables);
                 this.Bind(ViewModel, vm => vm.DoubleClick2Activate, v => v.togDoubleClick2Activate.IsChecked).DisposeWith(disposables);
-                this.Bind(ViewModel, vm => vm.autoUpdateInterval, v => v.txtautoUpdateInterval.Text).DisposeWith(disposables);
-                this.Bind(ViewModel, vm => vm.trayMenuServersLimit, v => v.txttrayMenuServersLimit.Text).DisposeWith(disposables);
-                this.Bind(ViewModel, vm => vm.currentFontFamily, v => v.cmbcurrentFontFamily.Text).DisposeWith(disposables);
+                this.Bind(ViewModel, vm => vm.AutoUpdateInterval, v => v.txtautoUpdateInterval.Text).DisposeWith(disposables);
+                this.Bind(ViewModel, vm => vm.TrayMenuServersLimit, v => v.txttrayMenuServersLimit.Text).DisposeWith(disposables);
+                this.Bind(ViewModel, vm => vm.CurrentFontFamily, v => v.cmbcurrentFontFamily.Text).DisposeWith(disposables);
                 this.Bind(ViewModel, vm => vm.SpeedTestTimeout, v => v.cmbSpeedTestTimeout.Text).DisposeWith(disposables);
                 this.Bind(ViewModel, vm => vm.SpeedTestUrl, v => v.cmbSpeedTestUrl.Text).DisposeWith(disposables);
                 this.Bind(ViewModel, vm => vm.SpeedPingTestUrl, v => v.cmbSpeedPingTestUrl.Text).DisposeWith(disposables);
@@ -205,6 +172,60 @@ namespace v2rayN.Views
 
                 this.BindCommand(ViewModel, vm => vm.SaveCmd, v => v.btnSave).DisposeWith(disposables);
             });
+        }
+
+        private List<string> GetFonts(string path)
+        {
+            var lstFonts = new List<string>();
+            try
+            {
+                string[] searchPatterns = { "*.ttf", "*.ttc" };
+                var files = new List<string>();
+                foreach (var pattern in searchPatterns)
+                {
+                    files.AddRange(Directory.GetFiles(path, pattern));
+                }
+                var culture = _config.uiItem.currentLanguage == Global.Languages[0] ? "zh-cn" : "en-us";
+                var culture2 = "en-us";
+                foreach (var ttf in files)
+                {
+                    var families = Fonts.GetFontFamilies(Utils.GetFontsPath(ttf));
+                    foreach (FontFamily family in families)
+                    {
+                        var typefaces = family.GetTypefaces();
+                        foreach (Typeface typeface in typefaces)
+                        {
+                            typeface.TryGetGlyphTypeface(out GlyphTypeface glyph);
+                            //var fontFace = glyph.Win32FaceNames[new CultureInfo("en-us")];
+                            //if (!fontFace.Equals("Regular") && !fontFace.Equals("Normal"))
+                            //{
+                            //    continue;
+                            //}
+                            var fontFamily = glyph.Win32FamilyNames[new CultureInfo(culture)];
+                            if (Utils.IsNullOrEmpty(fontFamily))
+                            {
+                                fontFamily = glyph.Win32FamilyNames[new CultureInfo(culture2)];
+                                if (Utils.IsNullOrEmpty(fontFamily))
+                                {
+                                    continue;
+                                }
+                            }
+                            lstFonts.Add(fontFamily);
+                            break;
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Logging.SaveLog("fill fonts error", ex);
+            }
+            return lstFonts;
+        }
+
+        private void ClbdestOverride_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+        {
+            ViewModel.destOverride = clbdestOverride.SelectedItems.Cast<string>().ToList();
         }
     }
 }

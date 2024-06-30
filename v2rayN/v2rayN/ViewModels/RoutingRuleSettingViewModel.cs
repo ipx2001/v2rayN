@@ -4,6 +4,7 @@ using ReactiveUI.Fody.Helpers;
 using Splat;
 using System.Reactive;
 using System.Windows;
+using v2rayN.Enums;
 using v2rayN.Handler;
 using v2rayN.Models;
 using v2rayN.Resx;
@@ -115,7 +116,7 @@ namespace v2rayN.ViewModels
                 SaveRouting();
             });
 
-            Utils.SetDarkBorder(view, _config.uiItem.colorModeDark);
+            Utils.SetDarkBorder(view, _config.uiItem.followSystemTheme ? !Utils.IsLightTheme() : _config.uiItem.colorModeDark);
         }
 
         public void RefreshRulesItems()
@@ -129,6 +130,7 @@ namespace v2rayN.ViewModels
                     id = item.id,
                     outboundTag = item.outboundTag,
                     port = item.port,
+                    network = item.network,
                     protocols = Utils.List2String(item.protocol),
                     inboundTags = Utils.List2String(item.inboundTag),
                     domains = Utils.List2String(item.domain),
@@ -289,7 +291,7 @@ namespace v2rayN.ViewModels
 
         private void ImportRulesFromClipboard()
         {
-            string clipboardData = Utils.GetClipboardData();
+            var clipboardData = Utils.GetClipboardData();
             if (AddBatchRoutingRules(SelectedRouting, clipboardData) == 0)
             {
                 RefreshRulesItems();

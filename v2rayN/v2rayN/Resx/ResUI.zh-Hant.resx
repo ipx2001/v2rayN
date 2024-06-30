@@ -358,7 +358,7 @@
     <value>請填寫正確的自訂DNS</value>
   </data>
   <data name="TransportPathTip1" xml:space="preserve">
-    <value>*ws/httpupgrade path</value>
+    <value>*ws/httpupgrade/splithttp path</value>
   </data>
   <data name="TransportPathTip2" xml:space="preserve">
     <value>*h2 path</value>
@@ -373,7 +373,7 @@
     <value>*http host中間逗號(,)分隔</value>
   </data>
   <data name="TransportRequestHostTip2" xml:space="preserve">
-    <value>*ws/httpupgrade host</value>
+    <value>*ws/httpupgrade/splithttp host</value>
   </data>
   <data name="TransportRequestHostTip3" xml:space="preserve">
     <value>*h2 host中間逗號(,)分隔</value>
@@ -1037,7 +1037,7 @@
     <value>複製字型TTF/TTC文件到目錄guiFonts，重啟設定</value>
   </data>
   <data name="TbSettingsSocksPortTip" xml:space="preserve">
-    <value>HTTP埠=SOCKS埠+1</value>
+    <value>http端口= +1；Pac端口= +4；*ray API端口= +5；mihomo API端口= +6；</value>
   </data>
   <data name="TbSettingsStartBootTip" xml:space="preserve">
     <value>以管理員權限設定此項，在啟動後獲得管理員權限</value>
@@ -1182,5 +1182,11 @@
   </data>
   <data name="LvCustomRulesetPath4Singbox" xml:space="preserve">
     <value>自訂sing-box rule-set</value>
+  </data>
+  <data name="NeedRebootTips" xml:space="preserve">
+    <value>操作成功。 請點選設定選單重啟應用程式。</value>
+  </data>
+  <data name="menuOpenTheFileLocation" xml:space="preserve">
+    <value>打開儲存所在的位置</value>
   </data>
 </root>
